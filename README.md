@@ -1,6 +1,7 @@
 # Banggood Cash Collection bot
 This simple python code utlizes Selenium to collect cash in Banggood's virtual cash game.
-please install the requirement packages using pip install.
+
+Please install the required packages using pip install before running the script.
 
 ## How to use:
 Create a `.env` file inside your folder and insert the following variables:
