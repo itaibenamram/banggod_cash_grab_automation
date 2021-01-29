@@ -4,6 +4,9 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from fake_useragent import UserAgent
+import pickle
 import urllib.request
 import time
 import datetime
@@ -12,7 +15,52 @@ import pyautogui
 # Setting environement variables
 USERNAME = config('API_USERNAME')
 PASSWORD = config('API_PASSWORD')
-WEB_DRIVER = config('API_DRIVER')
+CHROME_PATH = config('CHROME_PATH')
+game_link = "https://www.banggood.com/Casual-Game-Money-Box.html?utmid=15618&bid=41104"
+
+def create_driver():
+    options = Options()
+    ua = UserAgent()
+    userAgent = ua.random
+    print(userAgent)
+    options.add_argument(f'user-agent={userAgent}')
+    driver = webdriver.Chrome(options=options, executable_path=CHROME_PATH)
+    return driver
+
+def set_cookie():
+    try:
+        cookies = pickle.load(open("cookies.pkl", "rb"))
+        print("loading cookies...")
+        print(type(cookies))
+        for cookie in cookies:
+            driver.add_cookie(cookie)
+        
+    except:
+        print("Was not able to load cookies, trying to login")
+        
+def load_cookie():
+    print("Trying to get cookie")
+    pickle.dump(driver.get_cookies(), open("cookies.pkl", "wb"))
+    print("Cookie Set")
+    
+def login_to_banggood():
+    try:
+        print("Looking for logging element")
+        WebDriverWait(driver,10).until(EC.visibility_of_element_located((By.CSS_SELECTOR, f"div.header-user-title")))
+        print("Element Found, Logging in")
+
+        # Logging In
+        driver.find_element_by_xpath('//*[@id="header"]/div[2]/div/div[2]/ul/li[1]/div[1]/span/a[2]').click()
+        time.sleep(0.5)
+        email_input = driver.find_element_by_name("login-email")
+        password_input = driver.find_element_by_name("login-pwd")
+        email_input.send_keys(USERNAME)
+        password_input.send_keys(PASSWORD)
+        print("submitting information")
+        driver.find_element_by_name("login-submit").click()
+    except:
+        print("Could not login - continuing")
+        return
 
 def find_maxium_deposit():
     maximum_cash_text = WebDriverWait(driver,10).until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[1]/div[1]/div/div[1]/div/div/div[2]/div/p[3]")))
@@ -20,27 +68,38 @@ def find_maxium_deposit():
     print(f'Max Cash is:{maximum_cash}')
     return maximum_cash
 
-def main():
-    # Navigating to game machine page
-    driver.get("https://www.banggood.com/Casual-Game-Money-Box.html?utmid=15618&bid=41104")
-    print("Looking for element")
-    WebDriverWait(driver,10).until(EC.visibility_of_element_located((By.CSS_SELECTOR, f"div.header-user-title")))
-    print("Element Found, Logging in")
+def repeat_single_daily(daily_element, daily_type, button_xpath, wait_time):
+    daily_element = daily_element.get_attribute("innerText")[-4:-1].split("/")
+    print(f"{daily_type} count is {daily_element[0]} out of {daily_element[1]}")
+    if int(daily_element[0]) < int(daily_element[1]):
+        print("Starting {daily_type} dailies")
+        for i in range(int(daily_element[0]), int(daily_element[1])):
+            try:
+                button = driver.find_element_by_xpath(button_xpath)
+                button_text = button.get_attribute("innerText")
+                print(button_text)
+                if button_text == "GO":
+                    button.click()
+                    time.sleep(wait_time)
+                    driver.get(game_link)
+                    time.sleep(3)
+                elif button_text == "GET":
+                    button.click()
+                    time.sleep(5)
+            except:
+                print("Could not find button")
 
-    # Logging In
-    driver.find_element_by_xpath('//*[@id="header"]/div[2]/div/div[2]/ul/li[1]/div[1]/span/a[2]').click()
-    time.sleep(0.5)
-    email_input = driver.find_element_by_name("login-email")
-    password_input = driver.find_element_by_name("login-pwd")
-    email_input.send_keys(USERNAME)
-    password_input.send_keys(PASSWORD)
-    print("submitting information")
-    driver.find_element_by_name("login-submit").click()
+def do_dailies():
+    print("Checking dailies")
+    selected_products_count = driver.find_element_by_xpath("/html/body/div[1]/div[1]/div/div[2]/div[2]/div[3]/div/div[3]/div[3]/ul/li/p[3]/span")
+    repeat_single_daily(selected_products_count, "Selected Procuts", "/html/body/div[1]/div[1]/div/div[2]/div[2]/div[3]/div/div[3]/div[3]/ul/li/p[4]/span", 10)
+            
+    activity_for_15s_count = driver.find_element_by_xpath("/html/body/div[1]/div[1]/div/div[2]/div[2]/div[3]/div/div[2]/div[3]/ul/li/p[3]/span")
+    repeat_single_daily(activity_for_15s_count, "Activity for 15s", "/html/body/div[1]/div[1]/div/div[2]/div[2]/div[3]/div/div[2]/div[3]/ul/li/p[4]/span", 15)
 
-    # Looking for maximum cash ammount
-    maximum_cash = find_maxium_deposit()
-    print(f'Starting cash detection - will deposit when at {maximum_cash}')
+    print("Finished Dailies")
 
+def collect_cash(maximum_cash):
     # Time logging
     start_time = datetime.datetime.now()
     print(f'Time collection start: {start_time.strftime("%H:%M:%S")}')
@@ -62,20 +121,36 @@ def main():
                 print(f'Current deposit took: {current_time - start_time} ')
                 start_time = current_time
                 driver.find_element_by_xpath("/html/body/div[1]/div[1]/div/div[1]/div/div/div[2]/div/div").click()
+                break
             except:
                 continue
         time.sleep(10)
 
-def create_driver():
-    user_input = WEB_DRIVER.lower()
-    if user_input == "chrome":
-        return webdriver.Chrome()
-    elif user_input == "edge":
-        return webdriver.Edge()
+def main():
+
+    driver.get("http://www.banggood.com")
+    set_cookie()
+    driver.refresh()
+    time.sleep(5)
+    
+    # Login to Banggood
+    login_to_banggood()
+    
+    continue_affirmation = input("Contine? y/n  ")
+    
+    if continue_affirmation == "y":
+        load_cookie()
+        driver.get(game_link)
+        # Looking for maximum cash ammount
+        maximum_cash = find_maxium_deposit()
+        print(f'Starting cash detection - will deposit when at {maximum_cash}')
+        while True:
+            do_dailies()
+            collect_cash(maximum_cash)
     else:
-        return webdriver.Firefox()
+        driver.quit()
 
 
 if __name__ == "__main__":
     driver = create_driver()
-    main()    
+    main()
