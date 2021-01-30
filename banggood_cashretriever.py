@@ -18,6 +18,11 @@ PASSWORD = config('API_PASSWORD')
 CHROME_PATH = config('CHROME_PATH')
 game_link = "https://www.banggood.com/Casual-Game-Money-Box.html?utmid=15618&bid=41104"
 
+def print_message(message):
+    message_time = datetime.datetime.now().strftime("%H:%M:%S")
+    print(f"{message_time}: {message}")
+    return
+
 def create_driver():
     options = Options()
     ua = UserAgent()
@@ -30,24 +35,25 @@ def create_driver():
 def load_cookie():
     try:
         cookies = pickle.load(open("cookies.pkl", "rb"))
-        print("loading cookies...")
-        print(type(cookies))
+        print_message("loading cookies...")
         for cookie in cookies:
             driver.add_cookie(cookie)
-        
+        return
     except:
-        print("Was not able to load cookies, trying to login")
+        print_message("ERROR - Was not able to load cookies, trying to login")
+        return
         
 def set_cookie():
-    print("Trying to get cookie")
+    print_message("Trying to get cookie")
     pickle.dump(driver.get_cookies(), open("cookies.pkl", "wb"))
-    print("Cookie Set")
+    print_message("Cookie Set")
+    return
 
 def login_to_banggood():
     try:
-        print("Looking for logging element")
+        print_message("Looking for logging element")
         WebDriverWait(driver,10).until(EC.visibility_of_element_located((By.CSS_SELECTOR, f"div.header-user-title")))
-        print("Element Found, Logging in")
+        print_message("Element Found, Logging in")
 
         # Logging In
         driver.find_element_by_xpath('//*[@id="header"]/div[2]/div/div[2]/ul/li[1]/div[1]/span/a[2]').click()
@@ -56,31 +62,31 @@ def login_to_banggood():
         password_input = driver.find_element_by_name("login-pwd")
         email_input.send_keys(USERNAME)
         password_input.send_keys(PASSWORD)
-        print("submitting information")
+        print_message("submitting information")
         driver.find_element_by_name("login-submit").click()
     except:
-        print("Could not login - continuing")
+        print_message("Could not login - continuing")
         return
 
 def find_maxium_deposit():
     maximum_cash_element = WebDriverWait(driver,10).until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[1]/div[1]/div/div[1]/div/div/div[2]/div/p[3]")))
     maximum_cash = maximum_cash_element.get_attribute('innerText')[20:]
-    print(f'Max Cash is:{maximum_cash}')
+    print_message(f'Max Cash is:{maximum_cash}')
     return maximum_cash
 
 def repeat_single_daily(daily_element, daily_type, button_xpath, wait_time):
     daily_element = daily_element.get_attribute("innerText")[-4:-1].split("/")
     daily_lower_bound = int(daily_element[0])
     daily_upper_bound = int(daily_element[1])
-    print(f"{daily_type} count is {daily_lower_bound} out of {daily_upper_bound}")
+    print_message(f"{daily_type} count is {daily_lower_bound} out of {daily_upper_bound}")
     if int(daily_lower_bound) < int(daily_upper_bound):
-        print(f"Starting {daily_type} dailies")
-        for i in range(int(daily_lower_bound), int(daily_upper_bound)):
+        print_message(f"Starting {daily_type} dailies")
+        for i in range(0, (int(daily_upper_bound) - int(daily_lower_bound))*2):
             try:
                 button = WebDriverWait(driver,10).until(EC.visibility_of_element_located((By.XPATH, button_xpath)))
-                print("Detected daily task button")
+                print_message("Detected daily task button")
                 button_text = button.get_attribute("innerText")
-                print(f"Collecting task {i} out of {daily_upper_bound} - button_text")
+                print_message(f"Collecting task {i} out of {daily_upper_bound}")
                 if button_text == "GO":
                     button.click()
                     time.sleep(wait_time)
@@ -88,22 +94,21 @@ def repeat_single_daily(daily_element, daily_type, button_xpath, wait_time):
                 elif button_text == "GET":
                     button.click()
             except:
-                print("Could not find button")
+                print_message("Could not find button")
 
 def do_dailies():
-    print("Checking dailies")
+    print_message("Checking dailies")
     selected_products_count = WebDriverWait(driver,10).until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[1]/div[1]/div/div[2]/div[2]/div[3]/div/div[3]/div[3]/ul/li/p[3]/span")))
     repeat_single_daily(selected_products_count, "Selected Procuts", "/html/body/div[1]/div[1]/div/div[2]/div[2]/div[3]/div/div[3]/div[3]/ul/li/p[4]/span", 10)
             
     activity_for_15s_count =  WebDriverWait(driver,10).until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[1]/div[1]/div/div[2]/div[2]/div[3]/div/div[2]/div[3]/ul/li/p[3]/span")))
     repeat_single_daily(activity_for_15s_count, "Activity for 15s", "/html/body/div[1]/div[1]/div/div[2]/div[2]/div[3]/div/div[2]/div[3]/ul/li/p[4]/span", 16)
 
-    print("Finished Dailies")
+    print_message("Dailies done.")
 
 def collect_cash(maximum_cash):
     # Time logging
-    start_time = datetime.datetime.now()
-    print(f'Time collection start: {start_time.strftime("%H:%M:%S")}')
+    print_message(f'Started Collecting')
 
     failure_counter = 0
     while True:
@@ -113,14 +118,12 @@ def collect_cash(maximum_cash):
         except:
             failure_counter += 1
             if failure_counter > 5:
+                print_message("ERROR - Lost cash html element - breaking cash grab")
                 break
             continue
         if int(cash) >= int(maximum_cash)/2:
             try:
-                current_time = datetime.datetime.now()
-                print(f'Collected {cash} at {current_time.strftime("%H:%M:%S")}')
-                print(f'Current deposit took: {current_time - start_time} ')
-                start_time = current_time
+                print_message(f'Collected {cash}')
                 driver.find_element_by_xpath("/html/body/div[1]/div[1]/div/div[1]/div/div/div[2]/div/div").click()
                 break
             except:
@@ -148,6 +151,8 @@ def main():
         while True:
             do_dailies()
             collect_cash(maximum_cash)
+            driver.refresh()
+            time.sleep(5)
     else:
         driver.quit()
 
