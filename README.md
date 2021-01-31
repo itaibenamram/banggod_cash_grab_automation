@@ -1,6 +1,7 @@
 # Banggood Cash Collection bot :moneybag:
-This simple python code utlizes Selenium to collect cash in Banggood's virtual cash game :money_mouth_face:.
-please install the requirement packages using pip install before trying to run the script.
+Use Selenium to collect cash in Banggood's virtual cash game :money_mouth_face:.
+
+Please report any bugs you find or create an issue :exclamation: .
 
 ## How to use :green_book: :
 First clone the repository, and then install the required dependencies using:
@@ -21,5 +22,8 @@ CHROME_PATH=path-to-your-chrome-web-driver
 - The bot can now do the "15 seconds browsing" and "random product" dailies and will check after every deposit if dailies needs to be done/finished.
 - Activting the script requires a "continue affirmation" after login, simply press `y` when requested (please ensure you are logged in), this was added due to Banggood's bot protection.
 
-### Please consider staring the repository!
-If you're using my project, please consider :star: the project
+## Upcoming updates:
+- enable the option to run the script without the need to affirm you're logged in.
+- enable the option to run the script withouth logs.
+
+#### Please consider :star:ing the repository!
